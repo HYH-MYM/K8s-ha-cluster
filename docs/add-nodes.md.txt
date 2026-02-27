@@ -1,0 +1,21 @@
+```markdown
+# 添加其他节点到集群
+
+## 1. 添加其他 Master 节点（master2、master3）
+在 master2 和 master3 上执行第一步初始化时输出的 join 命令（带有 `--control-plane` 和 `--certificate-key` 参数），例如：
+```bash
+kubeadm join 192.168.10.100:6443 --token <token> \
+    --discovery-token-ca-cert-hash sha256:<hash> \
+    --control-plane --certificate-key <cert-key>
+2. 添加 Worker 节点（worker1）
+在 worker1 上执行 join 命令（不带 --control-plane）：
+
+bash
+kubeadm join 192.168.10.100:6443 --token <token> \
+    --discovery-token-ca-cert-hash sha256:<hash>
+3. 验证所有节点状态
+在 master1 上执行：
+
+bash
+kubectl get nodes
+所有节点状态应为 Ready。

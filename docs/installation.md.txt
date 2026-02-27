@@ -1,0 +1,121 @@
+```markdown
+# 安装 Containerd 和 Kubernetes 组件
+
+## 一、安装 Containerd（所有节点）
+
+### 1. 安装指定版本 containerd（2.2.1）
+从 GitHub 下载二进制包（推荐）：
+```bash
+wget https://github.com/containerd/containerd/releases/download/v2.2.1/containerd-2.2.1-linux-amd64.tar.gz
+tar Cxzvf /usr/local containerd-2.2.1-linux-amd64.tar.gz
+配置源安装（默认下载最新版本）：
+dnf install -y yum-utils
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+dnf install -y containerd.io
+mkdir -p /etc/containerd
+containerd config default | tee /etc/containerd/config.toml
+2. 配置镜像加速器
+创建目录：
+
+bash
+mkdir -p /etc/containerd/certs.d/docker.io
+创建 /etc/containerd/certs.d/docker.io/hosts.toml：
+
+toml
+server = "https://registry-1.docker.io"
+[host."https://5rhvv1rk.mirror.aliyuncs.com"]
+  capabilities = ["pull", "resolve"]
+可选：为 gcr.io 和 registry.k8s.io 添加国内镜像（参考 configs/containerd/certs.d/ 下的文件）。
+
+3. 修改 config.toml 启用镜像加速
+编辑 /etc/containerd/config.toml，找到 [plugins."io.containerd.grpc.v1.cri".registry] 部分，设置：
+
+toml
+[plugins."io.containerd.grpc.v1.cri".registry]
+   config_path = "/etc/containerd/certs.d"
+同时确保 SystemdCgroup 为 true（在 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options] 下）。
+
+4. 启动 containerd
+bash
+systemctl daemon-reload
+systemctl enable --now containerd
+二、安装 Kubernetes 组件（所有节点）
+1. 添加 Kubernetes 仓库
+创建 /etc/yum.repos.d/kubernetes.repo：
+
+ini
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.35/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.35/rpm/repodata/repomd.xml.key
+exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
+2. 安装 kubeadm、kubelet、kubectl
+bash
+dnf install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+systemctl enable kubelet
+3. 配置 kubelet 额外参数
+创建 /etc/sysconfig/kubelet：
+
+ini
+KUBELET_EXTRA_ARGS=--cgroup-driver=systemd --container-runtime-endpoint=unix:///run/containerd/containerd.sock
+三、配置高可用组件（Master 节点）
+1. 安装 HAProxy 和 Keepalived
+bash
+dnf install -y keepalived haproxy
+2. 配置 HAProxy（所有 Master 相同）
+备份原配置：
+
+bash
+mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+创建 /etc/haproxy/haproxy.cfg，内容见 configs/haproxy/haproxy.cfg。
+
+3. 配置 Keepalived
+根据节点角色修改配置文件，示例见 configs/keepalived/。
+
+创建健康检查脚本 /etc/keepalived/check_haproxy.sh（内容见配置文件）
+
+创建通知脚本 /etc/keepalived/notify.sh（可选）
+
+创建Keepalived状态切换通知脚本 
+/etc/keepalived/master.sh
+ #!/bin/bash
+echo "Become MASTER" >> /var/log/keepalived.log
+
+/etc/keepalived/backup.sh
+#!/bin/bash
+echo "Become BACKUP" >> /var/log/keepalived.log
+
+4. 启动服务
+bash
+systemctl enable --now haproxy keepalived
+验证 VIP 是否已绑定：
+
+bash
+ip addr show | grep 192.168.10.100
+四、初始化集群（仅在 master1 执行）
+1. 创建 kubeadm 配置文件
+将 configs/kubernetes/kubeadm-init-config.yaml 复制到 /etc/kubernetes/ 并修改（主要是 advertiseAddress 为本机 IP）。
+
+2. 执行初始化
+bash
+kubeadm init --config /etc/kubernetes/kubeadm-init-config.yaml --upload-certs
+记录输出的 join 命令，后续添加其他节点需要使用。
+
+3. 配置 kubectl
+bash
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+4. 安装 Calico 网络插件
+bash
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/tigera-operator.yaml
+等待 operator 启动后，创建 Installation 资源：
+
+bash
+kubectl apply -f configs/kubernetes/calico.yaml
+5. 验证集群状态
+bash
+kubectl get nodes
+kubectl get pods -n calico-system

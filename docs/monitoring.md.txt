@@ -1,0 +1,34 @@
+```markdown
+# 部署 Prometheus 监控
+
+## 1. 安装 Helm
+```bash
+wget https://get.helm.sh/helm-v3.14.4-linux-amd64.tar.gz
+tar -zxvf helm-v3.14.4-linux-amd64.tar.gz
+mv linux-amd64/helm /usr/local/bin/helm
+helm version
+2. 添加 Prometheus 仓库
+bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+3. 创建命名空间并安装 kube-prometheus-stack
+bash
+kubectl create namespace monitoring
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
+  --set grafana.adminPassword=admin \
+  --set grafana.service.type=NodePort
+4. 获取 Grafana 登录密码（如果未固定为 admin）
+bash
+kubectl get secret --namespace monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+5. 访问 Grafana
+通过 NodePort 访问（端口通常是 3xxxx）：
+
+bash
+kubectl get svc -n monitoring prometheus-grafana
+或使用端口转发：
+
+bash
+kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
+浏览器访问 http://localhost:3000，用户名 admin，密码为上述获取的值。

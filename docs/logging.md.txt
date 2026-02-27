@@ -1,0 +1,32 @@
+```markdown
+# 部署 Loki 日志系统
+
+## 1. 安装 Local Path Provisioner（提供动态存储）
+```bash
+kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+kubectl patch storageclass local-path -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+2. 添加 Loki 仓库
+bash
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+3. 安装 Loki Stack
+bash
+helm install loki grafana/loki-stack \
+  --namespace monitoring \
+  --set grafana.enabled=true \
+  --set promtail.enabled=true \
+  --set loki.persistence.enabled=true \
+  --set loki.persistence.size=5Gi \
+  --set loki.persistence.storageClassName=local-path
+4. 验证 Loki 组件
+bash
+kubectl get pods -n monitoring -l app=loki
+kubectl get svc -n monitoring loki
+5. 在 Grafana 中添加 Loki 数据源
+登录 Grafana
+
+进入 Configuration → Data Sources
+
+添加 Loki，URL 填写 http://loki:3100
+
+保存并测试
