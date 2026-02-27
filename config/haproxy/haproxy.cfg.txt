@@ -1,0 +1,45 @@
+global
+    log         127.0.0.1 local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+    stats socket /var/lib/haproxy/stats
+defaults
+    mode                    tcp
+    log                     global
+    option                  tcplog
+    option                  dontlognull
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 3000
+listen stats
+    bind 0.0.0.0:8888
+    mode http
+    stats enable
+    stats uri /haproxy?stats
+    stats refresh 5s
+    stats admin if LOCALHOST
+frontend k8s-api
+    bind 0.0.0.0:6443
+    bind 127.0.0.1:6443
+    mode tcp
+    option tcplog
+    default_backend k8s-api-backend
+backend k8s-api-backend
+    mode tcp
+    option tcplog
+    option tcp-check
+    balance roundrobin
+    server k8s-master1 192.168.10.11:8443 check fall 3 rise 2
+    server k8s-master2 192.168.10.12:8443 check fall 3 rise 2
+    server k8s-master3 192.168.10.13:8443 check fall 3 rise 2

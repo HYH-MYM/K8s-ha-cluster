@@ -1,0 +1,75 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 192.168.10.11
+  bindPort: 8443                # API Server实际监听端口，与haproxy后端配置一致
+nodeRegistration:
+  criSocket: unix:///var/run/containerd/containerd.sock
+  imagePullPolicy: IfNotPresent
+  name: master1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: v1.35.0
+controlPlaneEndpoint: "192.168.10.100:6443"   # 外部访问的VIP+HAProxy端口
+apiServer:
+  certSANs:
+  - "192.168.10.100"
+  - "vip"
+  - "192.168.10.11"
+  - "192.168.10.12"
+  - "192.168.10.13"
+  - "192.168.10.14"
+  - "127.0.0.1"
+  - "localhost"
+  - "kubernetes"
+  - "kubernetes.default"
+  - "kubernetes.default.svc"
+  - "kubernetes.default.svc.cluster.local"
+  extraArgs:
+    authorization-mode: Node,RBAC
+    secure-port: "8443"          # 明确指定secure-port
+    bind-address: "0.0.0.0"
+  extraVolumes:
+  - name: localtime
+    hostPath: /usr/share/zoneinfo/Asia/Shanghai
+    mountPath: /etc/localtime
+    readOnly: true
+    pathType: File
+controllerManager:
+  extraArgs:
+    bind-address: "0.0.0.0"
+    secure-port: "10257"
+scheduler:
+  extraArgs:
+    bind-address: "0.0.0.0"
+    secure-port: "10259"
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+    listenPeerURLs: "https://192.168.10.11:2380"
+    listenClientURLs: "https://192.168.10.11:2379"
+    advertiseClientURLs: "https://192.168.10.11:2379"
+networking:
+  dnsDomain: cluster.local
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/12"
+dns:
+  type: CoreDNS
+  imageTag: 1.11.1
+imageRepository: registry.aliyuncs.com/google_containers   # 使用阿里云镜像仓库
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd
+containerRuntimeEndpoint: unix:///run/containerd/containerd.sock
+serializeImagePulls: false
+---
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: ipvs
+ipvs:
+  strictARP: true

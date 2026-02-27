@@ -1,0 +1,11 @@
+这是一个补丁说明，不是完整文件。因为完整 config.toml 很大，这里给出需要修改的关键部分：
+
+# 在 [plugins."io.containerd.grpc.v1.cri".registry] 下添加
+  config_path = "/etc/containerd/certs.d"
+
+# 在 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options] 下确保
+  SystemdCgroup = true
+实际使用时，可以用 sed 命令修改，或者直接手动编辑。
+# 修改 config.toml 启用镜像加速
+sed -i 's|config_path = ""|config_path = "/etc/containerd/certs.d"|g' /etc/containerd/config.toml
+sed -i 's|SystemdCgroup = false|SystemdCgroup = true|g' /etc/containerd/config.toml

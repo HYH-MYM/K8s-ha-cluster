@@ -1,0 +1,31 @@
+global_defs {
+    router_id LVS_K8S_MASTER1
+    script_user root
+    enable_script_security
+}
+vrrp_script check_haproxy {
+    script "killall -0 haproxy"
+    interval 2
+    weight -20
+    fall 3
+    rise 2
+}
+vrrp_instance VI_1 {
+    state MASTER
+    interface ens160  # 根据实际网卡修改
+    virtual_router_id 51
+    priority 100
+    advert_int 1
+    authentication {
+      auth_type PASS
+      auth_pass K8S_VIP_PASS
+    }
+    virtual_ipaddress {
+      192.168.10.100/24
+    }
+    track_script {
+      check_haproxy
+    }
+    notify_master "/etc/keepalived/master.sh"
+    notify_backup "/etc/keepalived/backup.sh"
+}
