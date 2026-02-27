@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "Become MASTER" >> /var/log/keepalived.log

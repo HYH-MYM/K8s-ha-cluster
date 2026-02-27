@@ -1,0 +1,55 @@
+#!/bin/bash
+# 安装 containerd 2.2.1（二进制方式）
+
+set -e
+
+# 下载并解压
+wget https://github.com/containerd/containerd/releases/download/v2.2.1/containerd-2.2.1-linux-amd64.tar.gz
+tar Cxzvf /usr/local containerd-2.2.1-linux-amd64.tar.gz
+
+# 创建 systemd 服务
+cat > /etc/systemd/system/containerd.service <<EOF
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target
+
+[Service]
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/local/bin/containerd
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=infinity
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 生成默认配置
+mkdir -p /etc/containerd
+containerd config default | tee /etc/containerd/config.toml
+
+# 配置镜像加速器
+mkdir -p /etc/containerd/certs.d/docker.io
+cat > /etc/containerd/certs.d/docker.io/hosts.toml <<'EOF'
+server = "https://registry-1.docker.io"
+[host."https://5rhvv1rk.mirror.aliyuncs.com"]
+  capabilities = ["pull", "resolve"]
+EOF
+
+# 修改 config.toml 启用镜像加速
+sed -i 's|config_path = ""|config_path = "/etc/containerd/certs.d"|g' /etc/containerd/config.toml
+sed -i 's|SystemdCgroup = false|SystemdCgroup = true|g' /etc/containerd/config.toml
+
+# 启动
+systemctl daemon-reload
+systemctl enable --now containerd
+
+echo "containerd 安装完成"

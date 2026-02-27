@@ -1,0 +1,28 @@
+#!/bin/bash
+# 在 master1 上初始化集群
+
+set -e
+
+# 检查是否为 master1
+if [ "$(hostname)" != "master1" ]; then
+    echo "此脚本只能在 master1 上运行"
+    exit 1
+fi
+
+# 复制 kubeadm 配置文件
+cp configs/kubernetes/kubeadm-init-config.yaml /etc/kubernetes/kubeadm-init-config.yaml
+
+# 初始化
+kubeadm init --config /etc/kubernetes/kubeadm-init-config.yaml --upload-certs | tee /root/kubeadm-init.log
+
+# 配置 kubectl
+mkdir -p $HOME/.kube
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+chown $(id -u):$(id -g) $HOME/.kube/config
+
+# 安装 Calico
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.0/manifests/tigera-operator.yaml
+sleep 30
+kubectl apply -f configs/kubernetes/calico.yaml
+
+echo "集群初始化完成，请保存 join 命令。"

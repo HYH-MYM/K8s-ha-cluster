@@ -1,0 +1,44 @@
+#!/bin/bash
+# 配置 HAProxy 和 Keepalived（Master 节点执行）
+
+set -e
+
+# 安装
+dnf install -y keepalived haproxy
+
+# 备份原有配置
+[ -f /etc/haproxy/haproxy.cfg ] && mv /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.bak
+[ -f /etc/keepalived/keepalived.conf ] && mv /etc/keepalived/keepalived.conf /etc/keepalived/keepalived.conf.bak
+
+# 复制 HAProxy 配置（假设当前目录有 haproxy.cfg）
+cp configs/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg
+
+# 复制健康检查脚本
+cp configs/keepalived/check_haproxy.sh /etc/keepalived/check_haproxy.sh
+chmod +x /etc/keepalived/check_haproxy.sh
+
+# 复制通知脚本
+cp configs/keepalived/notify.sh /etc/keepalived/notify.sh
+chmod +x /etc/keepalived/notify.sh
+
+# 根据主机名选择 Keepalived 配置
+case $(hostname) in
+    master1)
+        cp configs/keepalived/master1-keepalived.conf /etc/keepalived/keepalived.conf
+        ;;
+    master2)
+        cp configs/keepalived/master2-keepalived.conf /etc/keepalived/keepalived.conf
+        ;;
+    master3)
+        cp configs/keepalived/master3-keepalived.conf /etc/keepalived/keepalived.conf
+        ;;
+    *)
+        echo "未知主机名，请手动配置 Keepalived"
+        exit 1
+        ;;
+esac
+
+# 启动服务
+systemctl enable --now haproxy keepalived
+
+echo "HAProxy 和 Keepalived 配置完成"

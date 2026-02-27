@@ -1,0 +1,10 @@
+#!/bin/bash
+# 用于加入节点（需要传入 join 命令参数）
+# 用法：./06-join-node.sh "kubeadm join ..."
+
+if [ $# -eq 0 ]; then
+    echo "请提供完整的 join 命令作为参数"
+    exit 1
+fi
+
+eval "$@"

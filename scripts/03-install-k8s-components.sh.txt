@@ -1,0 +1,26 @@
+#!/bin/bash
+# 安装 kubeadm、kubelet、kubectl
+
+set -e
+
+# 添加 Kubernetes 仓库
+cat > /etc/yum.repos.d/kubernetes.repo <<EOF
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.35/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.35/rpm/repodata/repomd.xml.key
+exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
+EOF
+
+# 安装
+dnf install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+systemctl enable kubelet
+
+# 配置 kubelet 额外参数
+cat > /etc/sysconfig/kubelet <<EOF
+KUBELET_EXTRA_ARGS=--cgroup-driver=systemd --container-runtime-endpoint=unix:///run/containerd/containerd.sock
+EOF
+
+echo "Kubernetes 组件安装完成"
